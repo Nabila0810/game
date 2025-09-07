@@ -9,10 +9,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const playerVsPlayerBtn = document.getElementById('player-vs-player-btn');
     const playerVsAiBtn = document.getElementById('player-vs-ai-btn');
 
+    const availableSymbols = ['X', 'O', '★', '❤️', '💀', '☀️'];
+    let playerSymbols = [];
     let currentPlayer = 'X';
     let board = ['', '', '', '', '', '', '', '', ''];
     let isGameActive = true;
     let isVsAI = false;
+    let playerSymbol, aiSymbol;
+    let isChaosMode = false;
 
     const winningConditions = [
         [0, 1, 2],
@@ -25,6 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
         [2, 4, 6]
     ];
 
+    const shuffleArray = (array) => {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    };
+
     const handleCellClick = (e) => {
         const clickedCell = e.target;
         const clickedCellIndex = parseInt(clickedCell.getAttribute('data-index'));
@@ -36,25 +47,35 @@ document.addEventListener('DOMContentLoaded', () => {
         makeMove(clickedCell, clickedCellIndex, currentPlayer);
         checkResult();
 
-        if (isVsAI && isGameActive) {
+        if (isVsAI && isGameActive && currentPlayer === aiSymbol) {
             setTimeout(aiMove, 500);
         }
     };
 
     const makeMove = (cell, index, player) => {
         board[index] = player;
+        let className = `player-${player.toLowerCase()}`;
+        if (!['X', 'O'].includes(player)) {
+            const symbolNames = { '★': 'star', '❤️': 'heart', '💀': 'skull', '☀️': 'sun' };
+            className = `player-${symbolNames[player]}`;
+        }
         cell.innerHTML = player;
-        cell.classList.add(`player-${player.toLowerCase()}`);
+        cell.classList.add(className);
         anime({
             targets: cell,
             scale: [1.2, 1],
             easing: 'easeOutQuad',
             duration: 300
         });
+        changePlayer();
     };
 
     const changePlayer = () => {
-        currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+        currentPlayer = currentPlayer === playerSymbol ? aiSymbol : playerSymbol;
+        if (isChaosMode) {
+            playerSymbol = availableSymbols[Math.floor(Math.random() * availableSymbols.length)];
+            aiSymbol = availableSymbols.filter(s => s !== playerSymbol)[Math.floor(Math.random() * (availableSymbols.length - 1))];
+        }
     };
 
     const checkResult = () => {
@@ -78,10 +99,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (roundWon) {
-            messageText.innerHTML = `'${currentPlayer}' Menang 🎉`;
+            const winner = currentPlayer === playerSymbol ? aiSymbol : playerSymbol;
+            messageText.innerHTML = `'${winner}' Menang 🎉`;
             isGameActive = false;
             animateWinningCells(winningCells);
-            showMessage();
+            showMessage('winner');
             return;
         }
 
@@ -89,11 +111,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (roundDraw) {
             messageText.innerHTML = `Hasil Seri 😊`;
             isGameActive = false;
-            showMessage();
+            showMessage('draw');
             return;
         }
-
-        changePlayer();
     };
 
     const animateWinningCells = (winningCells) => {
@@ -108,24 +128,87 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const aiMove = () => {
-        let emptyCells = board.map((val, index) => val === '' ? index : null).filter(val => val !== null);
-        if (emptyCells.length === 0 || !isGameActive) return;
-        
-        // AI sederhana: ambil sel acak
-        const randomIndex = Math.floor(Math.random() * emptyCells.length);
-        const cellIndex = emptyCells[randomIndex];
-        const cell = cells[cellIndex];
-        
-        makeMove(cell, cellIndex, currentPlayer);
-        checkResult();
+        const bestMove = findBestMove(board, aiSymbol);
+        if (bestMove !== null) {
+            const cell = cells[bestMove];
+            makeMove(cell, bestMove, aiSymbol);
+            checkResult();
+        }
     };
 
-    const showMessage = () => {
+    // Logika Minimax tetap sama
+    const findBestMove = (board, player) => {
+        let bestScore = -Infinity;
+        let bestMove = null;
+
+        for (let i = 0; i < board.length; i++) {
+            if (board[i] === '') {
+                board[i] = player;
+                let score = minimax(board, 0, false);
+                board[i] = '';
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = i;
+                }
+            }
+        }
+        return bestMove;
+    };
+
+    const minimax = (board, depth, isMaximizingPlayer) => {
+        let score = checkScore(board);
+
+        if (score !== null) {
+            return score;
+        }
+
+        let emptySpots = board.filter(spot => spot === '');
+        if (emptySpots.length === 0) {
+            return 0;
+        }
+
+        if (isMaximizingPlayer) {
+            let bestScore = -Infinity;
+            for (let i = 0; i < board.length; i++) {
+                if (board[i] === '') {
+                    board[i] = aiSymbol;
+                    bestScore = Math.max(bestScore, minimax(board, depth + 1, false));
+                    board[i] = '';
+                }
+            }
+            return bestScore;
+        } else {
+            let bestScore = Infinity;
+            for (let i = 0; i < board.length; i++) {
+                if (board[i] === '') {
+                    board[i] = playerSymbol;
+                    bestScore = Math.min(bestScore, minimax(board, depth + 1, true));
+                    board[i] = '';
+                }
+            }
+            return bestScore;
+        }
+    };
+
+    const checkScore = (board) => {
+        for (let i = 0; i < winningConditions.length; i++) {
+            const [a, b, c] = winningConditions[i];
+            if (board[a] === board[b] && board[b] === board[c]) {
+                if (board[a] === aiSymbol) return 10;
+                if (board[a] === playerSymbol) return -10;
+            }
+        }
+        return null;
+    };
+
+    const showMessage = (type) => {
+        messageContainer.classList.add(type);
         messageContainer.classList.remove('hidden');
     };
 
     const hideMessage = () => {
         messageContainer.classList.add('hidden');
+        messageContainer.classList.remove('winner', 'draw');
     };
 
     const startGame = (vsAI) => {
@@ -138,20 +221,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const restartGame = () => {
         isGameActive = true;
-        currentPlayer = 'X';
+        
+        // Pilihan simbol acak untuk setiap pemain
+        const shuffledSymbols = [...availableSymbols];
+        shuffleArray(shuffledSymbols);
+        playerSymbol = shuffledSymbols[0];
+        aiSymbol = shuffledSymbols[1];
+        currentPlayer = playerSymbol;
+        
         board = ['', '', '', '', '', '', '', '', ''];
         hideMessage();
         cells.forEach(cell => {
             cell.innerHTML = '';
-            cell.classList.remove('player-x', 'player-o');
-            cell.style.backgroundColor = ''; // Reset background color
-            anime.remove(cell); // Stop any ongoing animation
+            cell.className = 'cell'; // Reset semua kelas
+            anime.remove(cell);
         });
+
+        if (isVsAI && currentPlayer === aiSymbol) {
+            setTimeout(aiMove, 500);
+        }
     };
 
     // Event Listeners
-    playerVsPlayerBtn.addEventListener('click', () => startGame(false));
-    playerVsAiBtn.addEventListener('click', () => startGame(true));
+    playerVsPlayerBtn.addEventListener('click', () => {
+        isChaosMode = true; // Aktifkan mode chaos
+        startGame(false);
+    });
+
+    playerVsAiBtn.addEventListener('click', () => {
+        isChaosMode = false; // Nonaktifkan mode chaos untuk lawan AI
+        startGame(true);
+    });
+
     cells.forEach(cell => cell.addEventListener('click', handleCellClick));
     restartBtn.addEventListener('click', restartGame);
     newGameBtn.addEventListener('click', () => {

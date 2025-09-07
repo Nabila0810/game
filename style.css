@@ -67,6 +67,20 @@ body {
     color: #4d94ff;
 }
 
+/* Simbol unik */
+.cell.player-star {
+    color: gold;
+}
+.cell.player-heart {
+    color: #ff69b4;
+}
+.cell.player-skull {
+    color: gray;
+}
+.cell.player-sun {
+    color: yellow;
+}
+
 .restart-btn {
     margin-top: 1.5rem;
     padding: 10px 20px;
